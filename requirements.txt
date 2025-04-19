@@ -1,0 +1,4 @@
+PySide6>=6.5.0
+pony>=0.7.16
+pytest>=7.3.1
+black>=23.3.0
