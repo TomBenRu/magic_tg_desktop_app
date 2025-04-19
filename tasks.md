@@ -5,10 +5,10 @@
 ### Projekteinrichtung
 - [x] Projektverzeichnis erstellen
 - [x] Magic the Gathering Regeln hinzufügen
-- [ ] Virtual Environment einrichten
-- [ ] PySide6, PonyORM und andere Abhängigkeiten installieren
-- [ ] Verzeichnisstruktur erstellen
-- [ ] Git-Repository initialisieren (optional)
+- [x] Virtual Environment einrichten
+- [x] PySide6, PonyORM und andere Abhängigkeiten installieren
+- [x] Verzeichnisstruktur erstellen
+- [x] Git-Repository initialisieren (optional)
 
 ### Datenmodelle
 - [ ] Grundlegende Entity-Modelle erstellen:

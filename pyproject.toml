@@ -1,6 +1,56 @@
 [project]
-name = "magic-tg-desktop-app"
+name = "magic_tg_desktop_app"
 version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.12"
-dependencies = []
+description = "Eine Desktop-Anwendung für Magic the Gathering"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+
+dependencies = [
+    "PySide6>=6.5.0",
+    "pony>=0.7.16",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.3.1",
+    "black>=23.3.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra -q"
+
+[tool.black]
+line-length = 88
+target-version = ["py38"]
+include = '\.pyi?$'
+
+[tool.ruff]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+]
+ignore = []
+line-length = 88
+target-version = "py38"
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.isort]
+known-first-party = ["app"]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/magic_tg_desktop_app"
+Repository = "https://github.com/yourusername/magic_tg_desktop_app.git"
+
+[project.scripts]
+magic-tg = "app.main:main"
