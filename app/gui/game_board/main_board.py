@@ -6,11 +6,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, Slot, QSize
 from PySide6.QtGui import QFont, QColor, QPalette
 
-from app.gui.widgets.card_widget import CardWidget
 from app.gui.game_board.card_display import create_card_widget, show_card_details
 from app.gui.game_board.game_dialogs import NewGameDialog, LoadGameDialog
 from app.logic.game_engine import GameEngine
-from app.gui.game_board.zones import GameZone
+from app.gui.game_board.zones import GameZone, BattlefieldZone
 
 from pony.orm import db_session
 import random
@@ -205,23 +204,36 @@ class GameBoardWidget(QWidget):
             QWidget: Das Widget der erstellten Spielerzone.
         """
         zone_widget = QWidget()
-        zone_layout = QHBoxLayout(zone_widget)
+        zone_layout = QVBoxLayout(zone_widget)  # Geändert zu vertikalem Layout
+
+        # Oberer Bereich für Hand, Bibliothek und Friedhof
+        upper_widget = QWidget()
+        upper_layout = QHBoxLayout(upper_widget)
+        upper_layout.setContentsMargins(0, 0, 0, 0)
 
         # Hand
         self.hand_zones = getattr(self, 'hand_zones', {})
-        player_id = self.player2_id if is_top else self.player1_id
-        self.hand_zones[player_id] = GameZone(f"Hand - Spieler {player_id}")
-        zone_layout.addWidget(self.hand_zones[player_id])
+        player_id = str(self.player2_id) if is_top else str(self.player1_id)
+        player_name = f"Spieler {player_id}"
+        self.hand_zones[player_id] = GameZone(f"Hand - {player_name}")
+        upper_layout.addWidget(self.hand_zones[player_id], 2)  # Hand bekommt mehr Platz
 
         # Bibliothek
         self.library_zones = getattr(self, 'library_zones', {})
-        self.library_zones[player_id] = GameZone(f"Bibliothek - Spieler {player_id}")
-        zone_layout.addWidget(self.library_zones[player_id])
+        self.library_zones[player_id] = GameZone(f"Bibliothek - {player_name}")
+        upper_layout.addWidget(self.library_zones[player_id], 1)
 
         # Friedhof
         self.graveyard_zones = getattr(self, 'graveyard_zones', {})
-        self.graveyard_zones[player_id] = GameZone(f"Friedhof - Spieler {player_id}")
-        zone_layout.addWidget(self.graveyard_zones[player_id])
+        self.graveyard_zones[player_id] = GameZone(f"Friedhof - {player_name}")
+        upper_layout.addWidget(self.graveyard_zones[player_id], 1)
+
+        zone_layout.addWidget(upper_widget)
+
+        # Battlefield
+        self.battlefield_zones = getattr(self, 'battlefield_zones', {})
+        self.battlefield_zones[player_id] = BattlefieldZone(f"Spielfeld - {player_name}", player_id)
+        zone_layout.addWidget(self.battlefield_zones[player_id], 3)  # Battlefield bekommt viel Platz
 
         return zone_widget
 
@@ -604,3 +616,222 @@ class GameBoardWidget(QWidget):
         """Wird aufgerufen, wenn zum nächsten Zug gewechselt werden soll."""
         if not self.game_engine:
             return
+            
+        # Wechsle den aktiven Spieler
+        if self.active_player_id == str(self.player1_id):
+            new_active_player_id = str(self.player2_id)
+            new_inactive_player_id = str(self.player1_id)
+        else:
+            new_active_player_id = str(self.player1_id)
+            new_inactive_player_id = str(self.player2_id)
+        
+        # Starte den neuen Zug
+        self.game_state = self.game_engine.start_turn(new_active_player_id)
+        self.active_player_id = new_active_player_id
+        self.inactive_player_id = new_inactive_player_id
+        
+        # Speichere den Spielzustand
+        self.game_engine.save_game_state()
+        
+        # UI aktualisieren
+        self.update_ui()
+        
+        # Statusmeldung
+        player_name = self.game_state['players'][new_active_player_id]['name']
+        self.status_bar.showMessage(f"Nächster Zug: {player_name} ist am Zug.")
+        
+    def update_ui(self):
+        """Aktualisiert die Benutzeroberfläche basierend auf dem aktuellen Spielzustand."""
+        if not self.game_state:
+            return
+            
+        # Aktualisiere Spielinfo
+        self.turn_value.setText(str(self.game_state.get('turn_number', 0)))
+        self.phase_value.setText(self._get_phase_name(self.game_state.get('phase', 'setup')))
+        
+        # Aktiver Spieler
+        active_player_id = self.game_state.get('active_player_id', '')
+        if active_player_id and active_player_id in self.game_state['players']:
+            active_player_name = self.game_state['players'][active_player_id]['name']
+            self.active_player_value.setText(active_player_name)
+        else:
+            self.active_player_value.setText("-")
+        
+        # Spielerinformationen aktualisieren
+        if self.player1_id and str(self.player1_id) in self.game_state['players']:
+            player1_data = self.game_state['players'][str(self.player1_id)]
+            self.player1_name_value.setText(player1_data['name'])
+            self.player1_life_value.setText(str(player1_data['life']))
+            self.player1_library_value.setText(str(len(player1_data['library'])))
+            
+            # Lebens-Status-Farbe anpassen
+            if player1_data['life'] > 10:
+                self.player1_life_value.setStyleSheet("font-weight: bold; color: green;")
+            elif player1_data['life'] > 5:
+                self.player1_life_value.setStyleSheet("font-weight: bold; color: orange;")
+            else:
+                self.player1_life_value.setStyleSheet("font-weight: bold; color: red;")
+        
+        if self.player2_id and str(self.player2_id) in self.game_state['players']:
+            player2_data = self.game_state['players'][str(self.player2_id)]
+            self.player2_name_value.setText(player2_data['name'])
+            self.player2_life_value.setText(str(player2_data['life']))
+            self.player2_library_value.setText(str(len(player2_data['library'])))
+            
+            # Lebens-Status-Farbe anpassen
+            if player2_data['life'] > 10:
+                self.player2_life_value.setStyleSheet("font-weight: bold; color: green;")
+            elif player2_data['life'] > 5:
+                self.player2_life_value.setStyleSheet("font-weight: bold; color: orange;")
+            else:
+                self.player2_life_value.setStyleSheet("font-weight: bold; color: red;")
+        
+        # Zonen aktualisieren
+        self._update_zones()
+        
+        # Aktualisiere die Phasen-Buttons
+        self._update_phase_buttons()
+        
+        # Aktualisiere Spieleraktionen
+        self._update_player_actions()
+        
+        # Emittiere Signal für Spielzustandsänderung
+        self.game_state_changed.emit(self.game_state)
+        
+    def _update_zones(self):
+        """Aktualisiert alle Spielzonen mit dem aktuellen Spielzustand."""
+        if not self.game_state:
+            return
+            
+        # Leere alle Zonen
+        for zone_dict in [self.hand_zones, self.library_zones, self.graveyard_zones, self.battlefield_zones]:
+            for zone in zone_dict.values():
+                zone.clear()
+                
+        self.stack_zone.clear()
+        self.exile_zone.clear()
+        
+        # Aktualisiere Spielerzonen
+        for player_id, player_data in self.game_state['players'].items():
+            # Hand
+            if player_id in self.hand_zones:
+                for card in player_data['hand']:
+                    # Für Spieler 1 zeigen wir die Karten, für Spieler 2 nicht (bei beiden Spielern am gleichen Gerät)
+                    show_face = (str(player_id) == str(self.player1_id))
+                    card_widget = create_card_widget(card, 'hand', player_id, self, show_face)
+                    self.hand_zones[player_id].add_card(card_widget)
+            
+            # Bibliothek
+            if player_id in self.library_zones and player_data['library']:
+                # Hier zeigen wir nur die Anzahl der Karten, nicht die Karten selbst
+                library_count = len(player_data['library'])
+                library_label = QLabel(f"{library_count} Karten")
+                library_label.setAlignment(Qt.AlignCenter)
+                library_label.setStyleSheet("font-weight: bold;")
+                self.library_zones[player_id].add_card(library_label)
+                
+                # Wir könnten auch die oberste Karte als verdeckt anzeigen
+                if library_count > 0:
+                    card = player_data['library'][0]  # Oberste Karte
+                    card_widget = create_card_widget(card, 'library', player_id, self, False)
+                    self.library_zones[player_id].add_card(card_widget)
+            
+            # Friedhof
+            if player_id in self.graveyard_zones:
+                for card in player_data['graveyard']:
+                    card_widget = create_card_widget(card, 'graveyard', player_id, self, True)
+                    self.graveyard_zones[player_id].add_card(card_widget)
+        
+        # Aktualisiere Battlefield
+        for card in self.game_state.get('battlefield', []):
+            controller_id = card.get('controller_id', '')
+            if controller_id in self.battlefield_zones:
+                card_widget = create_card_widget(card, 'battlefield', controller_id, self, True)
+                self.battlefield_zones[controller_id].add_card(card_widget)
+        
+        # Aktualisiere Stack
+        for card in self.game_state.get('stack', []):
+            card_widget = create_card_widget(card, 'stack', card.get('controller_id', ''), self, True)
+            self.stack_zone.add_card(card_widget)
+        
+        # Aktualisiere Exile
+        for card in self.game_state.get('exile', []):
+            card_widget = create_card_widget(card, 'exile', card.get('owner_id', ''), self, True)
+            self.exile_zone.add_card(card_widget)
+        
+    def _update_phase_buttons(self):
+        """Aktualisiert die Phasen-Buttons basierend auf der aktuellen Phase."""
+        if not self.game_state:
+            return
+            
+        current_phase = self.game_state.get('phase', 'setup')
+        
+        # Aktiviere/Deaktiviere Phasen-Buttons basierend auf dem Spielzustand
+        phase_order = [
+            'untap', 'upkeep', 'draw', 'main1', 
+            'combat_begin', 'combat_attackers', 'combat_blockers', 'combat_damage', 'combat_end',
+            'main2', 'end', 'cleanup'
+        ]
+        
+        # Finde den Index der aktuellen Phase
+        if current_phase in phase_order:
+            current_phase_index = phase_order.index(current_phase)
+        else:
+            current_phase_index = -1
+        
+        # Setze Status der Buttons
+        for phase_id, button in self.phase_buttons.items():
+            # Aktiviere nur die aktuelle und die nächste Phase
+            if current_phase_index >= 0 and phase_id in phase_order:
+                phase_index = phase_order.index(phase_id)
+                enabled = (phase_index == current_phase_index or phase_index == current_phase_index + 1)
+                button.setEnabled(enabled)
+                
+                # Markiere die aktuelle Phase
+                if phase_index == current_phase_index:
+                    button.setStyleSheet("background-color: lightblue;")
+                else:
+                    button.setStyleSheet("")
+            else:
+                # Wenn wir uns in der Setup-Phase befinden, aktiviere keine Phasen-Buttons
+                button.setEnabled(False)
+                button.setStyleSheet("")
+                
+    def _update_player_actions(self):
+        """Aktualisiert die Spieleraktionen basierend auf dem Spielzustand."""
+        if not self.game_state:
+            return
+            
+        # Aktiviere/Deaktiviere Aktionen basierend auf der Phase und dem aktiven Spieler
+        current_phase = self.game_state.get('phase', 'setup')
+        active_player_id = self.game_state.get('active_player_id', '')
+        
+        # Karte ziehen ist nur in der Ziehphase aktiv
+        self.draw_card_button.setEnabled(current_phase == 'draw' and active_player_id)
+        
+        # Alles enttappen ist nur in der Enttapp-Phase aktiv
+        self.untap_all_button.setEnabled(current_phase == 'untap' and active_player_id)
+        
+        # Nächster Zug ist nur in der Aufräumphase aktiv
+        self.next_turn_button.setEnabled(current_phase == 'cleanup' and active_player_id)
+        
+    def enable_game_controls(self, enabled=True):
+        """Aktiviert oder deaktiviert die Spielsteuerungselemente."""
+        # Aktiviere/Deaktiviere Steuerelemente
+        for button in self.phase_buttons.values():
+            button.setEnabled(enabled)
+            
+        self.draw_card_button.setEnabled(enabled)
+        self.untap_all_button.setEnabled(enabled)
+        self.next_turn_button.setEnabled(enabled)
+        self.end_game_button.setEnabled(enabled)
+        
+        if enabled:
+            # Wenn aktiviert, aktualisiere den Status basierend auf dem Spielzustand
+            self._update_phase_buttons()
+            self._update_player_actions()
+        else:
+            # Wenn deaktiviert, alle Steuerelemente ausschalten
+            self.draw_card_button.setEnabled(False)
+            self.untap_all_button.setEnabled(False)
+            self.next_turn_button.setEnabled(False)

@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QAction, QIcon
 
+from app.gui.game_board.main_board import GameBoardWidget
+
 
 class MainWindow(QMainWindow):
     """Hauptfenster der Magic the Gathering Desktop App."""
@@ -142,16 +144,11 @@ class MainWindow(QMainWindow):
     
     def init_game_tab(self):
         """Initialisiert den Spiel-Tab."""
-        # Hier wird später das Spielbrett implementiert
-        game_widget = QWidget()
-        game_layout = QVBoxLayout(game_widget)
-        
-        game_label = QLabel("Spielbrett (in Entwicklung)")
-        game_label.setAlignment(Qt.AlignCenter)
-        game_layout.addWidget(game_label)
+        # Das Spielbrett-Widget erstellen
+        self.game_board = GameBoardWidget()
         
         # Füge Tab hinzu
-        self.tab_widget.addTab(game_widget, "Spiel")
+        self.tab_widget.addTab(self.game_board, "Spiel")
     
     def on_new_deck(self):
         """Wird aufgerufen, wenn ein neues Deck erstellt werden soll."""
@@ -166,9 +163,14 @@ class MainWindow(QMainWindow):
     
     def on_new_game(self):
         """Wird aufgerufen, wenn ein neues Spiel gestartet werden soll."""
-        # Hier wird später ein neues Spiel gestartet
-        self.status_bar.showMessage("Neues Spiel wird gestartet...")
-        self.tab_widget.setCurrentIndex(2)  # Wechsle zum Spiel-Tab
+        # Wechsle zum Spiel-Tab
+        self.tab_widget.setCurrentIndex(2)  # Zum Spiel-Tab wechseln
+        
+        # Starte ein neues Spiel
+        self.game_board.on_new_game()
+        
+        # Statusmeldung
+        self.status_bar.showMessage("Neues Spiel gestartet.")
     
     def on_about(self):
         """Zeigt Informationen über die Anwendung an."""
